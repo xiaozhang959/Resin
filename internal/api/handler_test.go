@@ -41,7 +41,7 @@ func newTestServer() *Server {
 		ProxyBypassRules:                                []string{"localhost", "127.*"},
 		RequestLogQueueSize:                             8192,
 		RequestLogQueueFlushBatchSize:                   4096,
-		RequestLogQueueFlushInterval:                    5 * time.Minute,
+		RequestLogQueueFlushInterval:                    time.Second,
 		RequestLogDBMaxMB:                               512,
 		RequestLogDBRetainCount:                         5,
 		AdminToken:                                      "test-admin-token",

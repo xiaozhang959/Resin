@@ -3,13 +3,15 @@ package requestlog
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Resinat/Resin/internal/proxy"
 )
 
 // Service provides an async request log writer.
-// EmitRequestLog performs a non-blocking channel send (drops on overflow).
+// EmitRequestLog enqueues entries quickly in the common case and applies
+// backpressure when the queue is full instead of dropping audit data.
 // A background goroutine flushes batches to the Repo.
 type Service struct {
 	repo      *Repo
@@ -18,8 +20,9 @@ type Service struct {
 	interval  time.Duration
 	flushReq  chan chan struct{}
 
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	stopCh  chan struct{}
+	wg      sync.WaitGroup
+	started atomic.Bool
 }
 
 // ServiceConfig configures the request log service.
@@ -42,7 +45,7 @@ func NewService(cfg ServiceConfig) *Service {
 	}
 	interval := cfg.FlushInterval
 	if interval <= 0 {
-		interval = 5 * time.Minute
+		interval = time.Second
 	}
 	return &Service{
 		repo:      cfg.Repo,
@@ -56,6 +59,9 @@ func NewService(cfg ServiceConfig) *Service {
 
 // Start launches the background flush goroutine.
 func (s *Service) Start() {
+	if !s.started.CompareAndSwap(false, true) {
+		return
+	}
 	if s.repo != nil {
 		s.repo.setReadBarrier(s.FlushNow)
 	}
@@ -65,6 +71,9 @@ func (s *Service) Start() {
 
 // Stop signals the flush loop to stop, drains remaining entries, and returns.
 func (s *Service) Stop() {
+	if !s.started.CompareAndSwap(true, false) {
+		return
+	}
 	if s.repo != nil {
 		s.repo.setReadBarrier(nil)
 	}
@@ -72,18 +81,26 @@ func (s *Service) Stop() {
 	s.wg.Wait()
 }
 
-// EmitRequestLog enqueues a log entry. Non-blocking; drops on overflow.
+// EmitRequestLog enqueues a log entry.
+// When the queue is full, callers wait until the writer catches up. This keeps
+// request logging lossless under write bursts; backpressure is preferable to
+// silently losing audit records.
 func (s *Service) EmitRequestLog(entry proxy.RequestLogEntry) {
+	if !s.started.Load() {
+		return
+	}
 	select {
 	case s.queue <- entry:
-	default:
-		// Queue full — drop entry to avoid blocking hot path.
+	case <-s.stopCh:
 	}
 }
 
 // FlushNow asks the background writer to flush current buffered data to DB,
 // then blocks until that flush attempt completes.
 func (s *Service) FlushNow() {
+	if !s.started.Load() {
+		return
+	}
 	done := make(chan struct{})
 	select {
 	case s.flushReq <- done:
@@ -189,8 +206,8 @@ func (s *Service) drainAndFlush(batch []proxy.RequestLogEntry) {
 func (s *Service) flush(entries []proxy.RequestLogEntry) {
 	if n, err := s.repo.InsertBatch(entries); err != nil {
 		log.Printf("[requestlog] flush %d entries failed: %v", len(entries), err)
-	} else if n > 0 {
-		log.Printf("[requestlog] flushed %d entries", n)
+	} else if n != len(entries) {
+		log.Printf("[requestlog] warning: flushed %d/%d entries", n, len(entries))
 	}
 }
 
