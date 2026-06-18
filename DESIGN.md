@@ -2302,8 +2302,8 @@ GeoIP 与订阅的下载都有错误重试的需求。
 * `RESIN_PROXY_BYPASS`：不走代理节点的目标规则，默认空。用分号、逗号或换行分隔；命中规则的 HTTP 正向代理、SOCKS5 正向代理与反向代理请求会由 Resin 本机直连目标。支持精确主机、`*`/`?` 通配符、CIDR 网段与 `<local>`（无点号本地域名），例如 `localhost;127.*;10.*;172.16.0.0/12;192.168.*;<local>`。
 
 日志相关配置：
-* `RESIN_REQUEST_LOG_QUEUE_SIZE`：日志写入队列大小。至少是 RESIN_REQUEST_LOG_QUEUE_FLUSH_BATCH_SIZE 的两倍。默认 8192。
-* `RESIN_REQUEST_LOG_QUEUE_FLUSH_BATCH_SIZE`：批量写入数据库的大小。默认 4096.
+* `RESIN_REQUEST_LOG_QUEUE_SIZE`：日志写入队列大小。至少是 RESIN_REQUEST_LOG_QUEUE_FLUSH_BATCH_SIZE 的两倍。默认 65536。
+* `RESIN_REQUEST_LOG_QUEUE_FLUSH_BATCH_SIZE`：批量写入数据库的大小。默认 1024.
 * `RESIN_REQUEST_LOG_QUEUE_FLUSH_INTERVAL`：写库间隔。默认 "1s"。
 * `RESIN_REQUEST_LOG_DB_MAX_MB`：SQLite 当前活动日志数据库的最大字节数。默认 512。
 * `RESIN_REQUEST_LOG_DB_RETAIN_COUNT`：保留的历史日志数据库文件数量（滚动日志），默认 5。

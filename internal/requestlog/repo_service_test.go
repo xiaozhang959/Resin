@@ -387,8 +387,14 @@ func TestService_BackpressureDoesNotDropWhenQueueIsFull(t *testing.T) {
 	}
 }
 
-func TestService_DefaultFlushIntervalIsRealtime(t *testing.T) {
+func TestService_DefaultsFavorRealtimeReliability(t *testing.T) {
 	svc := NewService(ServiceConfig{})
+	if cap(svc.queue) != 65536 {
+		t.Fatalf("queue size: got %d, want %d", cap(svc.queue), 65536)
+	}
+	if svc.batchSize != 1024 {
+		t.Fatalf("batch size: got %d, want %d", svc.batchSize, 1024)
+	}
 	if svc.interval != time.Second {
 		t.Fatalf("interval: got %v, want %v", svc.interval, time.Second)
 	}

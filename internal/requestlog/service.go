@@ -37,11 +37,11 @@ type ServiceConfig struct {
 func NewService(cfg ServiceConfig) *Service {
 	queueSize := cfg.QueueSize
 	if queueSize <= 0 {
-		queueSize = 8192
+		queueSize = 65536
 	}
 	batchSize := cfg.FlushBatch
 	if batchSize <= 0 {
-		batchSize = 4096
+		batchSize = 1024
 	}
 	interval := cfg.FlushInterval
 	if interval <= 0 {
