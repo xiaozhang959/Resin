@@ -376,7 +376,7 @@ export function RequestLogsPage() {
   const logsQuery = useQuery({
     queryKey: ["request-logs", activeFilters, cursor],
     queryFn: () => listRequestLogs({ ...activeFilters, cursor }),
-    refetchInterval: pageIndex === 0 ? 15_000 : false,
+    refetchInterval: pageIndex === 0 ? 2_000 : false,
     placeholderData: (prev) => prev,
   });
 

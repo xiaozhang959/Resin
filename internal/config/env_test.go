@@ -76,8 +76,9 @@ func TestLoadEnvConfig_Defaults(t *testing.T) {
 	assertEqual(t, "ProxyBypassRulesLength", len(cfg.ProxyBypassRules), 0)
 
 	// Request log
-	assertEqual(t, "RequestLogQueueSize", cfg.RequestLogQueueSize, 8192)
-	assertEqual(t, "RequestLogQueueFlushBatchSize", cfg.RequestLogQueueFlushBatchSize, 4096)
+	assertEqual(t, "RequestLogQueueSize", cfg.RequestLogQueueSize, 65536)
+	assertEqual(t, "RequestLogQueueFlushBatchSize", cfg.RequestLogQueueFlushBatchSize, 1024)
+	assertEqual(t, "RequestLogQueueFlushInterval", cfg.RequestLogQueueFlushInterval, time.Second)
 	assertEqual(t, "RequestLogDBMaxMB", cfg.RequestLogDBMaxMB, 512)
 	assertEqual(t, "RequestLogDBRetainCount", cfg.RequestLogDBRetainCount, 5)
 

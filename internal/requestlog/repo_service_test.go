@@ -1,9 +1,11 @@
 package requestlog
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -331,6 +333,70 @@ func TestService_RepoReadFlushesQueuedLogs(t *testing.T) {
 	}
 	if rows[0].ID != "barrier-log-1" {
 		t.Fatalf("row id: got %q, want %q", rows[0].ID, "barrier-log-1")
+	}
+}
+
+func TestService_BackpressureDoesNotDropWhenQueueIsFull(t *testing.T) {
+	repo := NewRepo(t.TempDir(), 1<<20, 5)
+	if err := repo.Open(); err != nil {
+		t.Fatalf("repo.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+
+	svc := NewService(ServiceConfig{
+		Repo:          repo,
+		QueueSize:     1,
+		FlushBatch:    1,
+		FlushInterval: time.Hour,
+	})
+	svc.Start()
+	t.Cleanup(svc.Stop)
+
+	const total = 64
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(total)
+	baseTs := time.Now().UnixNano()
+	for i := 0; i < total; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			<-start
+			svc.EmitRequestLog(proxy.RequestLogEntry{
+				ID:          fmt.Sprintf("pressure-%03d", i),
+				StartedAtNs: baseTs + int64(i),
+				ProxyType:   proxy.ProxyTypeForward,
+				PlatformID:  "plat-pressure",
+				TargetHost:  "example.com",
+				TargetURL:   "https://example.com/pressure",
+				HTTPMethod:  "GET",
+				HTTPStatus:  200,
+				NetOK:       true,
+			})
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	rows, _, _, err := repo.List(ListFilter{PlatformID: "plat-pressure", Limit: total})
+	if err != nil {
+		t.Fatalf("repo.List: %v", err)
+	}
+	if len(rows) != total {
+		t.Fatalf("rows len: got %d, want %d", len(rows), total)
+	}
+}
+
+func TestService_DefaultsFavorRealtimeReliability(t *testing.T) {
+	svc := NewService(ServiceConfig{})
+	if cap(svc.queue) != 65536 {
+		t.Fatalf("queue size: got %d, want %d", cap(svc.queue), 65536)
+	}
+	if svc.batchSize != 1024 {
+		t.Fatalf("batch size: got %d, want %d", svc.batchSize, 1024)
+	}
+	if svc.interval != time.Second {
+		t.Fatalf("interval: got %v, want %v", svc.interval, time.Second)
 	}
 }
 
